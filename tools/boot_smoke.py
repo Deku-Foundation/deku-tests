@@ -38,6 +38,16 @@ def save_result(directory: Path, result: dict[str, object]) -> None:
     )
 
 
+def infer_firmware_vars(firmware: Path) -> Path | None:
+    """Return the matching OVMF variable-store template for standard code filenames."""
+    names = {
+        "OVMF_CODE.fd": "OVMF_VARS.fd",
+        "OVMF_CODE_4M.fd": "OVMF_VARS_4M.fd",
+    }
+    vars_name = names.get(firmware.name)
+    return firmware.with_name(vars_name) if vars_name else None
+
+
 def build_qemu_command(
     qemu: str,
     iso: Path,
@@ -105,13 +115,10 @@ def main() -> int:
     if args.firmware_vars:
         firmware_vars = args.firmware_vars.resolve()
     else:
-        inferred_vars = {
-            "OVMF_CODE.fd": "OVMF_VARS.fd",
-            "OVMF_CODE_4M.fd": "OVMF_VARS_4M.fd",
-        }.get(firmware.name)
+        inferred_vars = infer_firmware_vars(firmware)
         if not inferred_vars:
             return fail("--firmware-vars is required for non-standard OVMF filenames")
-        firmware_vars = firmware.with_name(inferred_vars)
+        firmware_vars = inferred_vars
     if not firmware_vars.is_file():
         return fail("--firmware-vars must name an existing UEFI variable-store template")
     actual_digest = sha256_file(iso)
