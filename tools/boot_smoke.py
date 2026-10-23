@@ -69,7 +69,7 @@ def main() -> int:
     parser.add_argument("--iso", required=True, type=Path, help="existing ISO to boot")
     parser.add_argument("--sha256", required=True, help="expected lowercase SHA-256 of the ISO")
     parser.add_argument("--firmware", required=True, type=Path, help="UEFI firmware code file")
-    parser.add_argument("--firmware-vars", required=True, type=Path, help="matching writable UEFI variable-store template")
+    parser.add_argument("--firmware-vars", type=Path, help="matching writable UEFI variable-store template (auto-detected for standard OVMF filenames)")
     parser.add_argument("--marker", required=True, help="serial marker emitted after userspace is ready")
     parser.add_argument("--timeout", type=int, default=180, help="boot timeout in seconds (default: 180)")
     parser.add_argument("--qemu", default="qemu-system-x86_64", help="QEMU executable")
@@ -92,8 +92,7 @@ def main() -> int:
         return fail("--iso must name an existing non-empty file")
     if not args.firmware.is_file():
         return fail("--firmware must name an existing UEFI firmware code file")
-    if not args.firmware_vars.is_file():
-        return fail("--firmware-vars must name an existing UEFI variable-store template")
+
     if not args.marker or len(args.marker) > 256 or any(ord(c) < 32 for c in args.marker):
         return fail("--marker must contain 1 to 256 printable characters")
     if not 10 <= args.timeout <= 900:
@@ -103,7 +102,18 @@ def main() -> int:
 
     iso = args.iso.resolve()
     firmware = args.firmware.resolve()
-    firmware_vars = args.firmware_vars.resolve()
+    if args.firmware_vars:
+        firmware_vars = args.firmware_vars.resolve()
+    else:
+        inferred_vars = {
+            "OVMF_CODE.fd": "OVMF_VARS.fd",
+            "OVMF_CODE_4M.fd": "OVMF_VARS_4M.fd",
+        }.get(firmware.name)
+        if not inferred_vars:
+            return fail("--firmware-vars is required for non-standard OVMF filenames")
+        firmware_vars = firmware.with_name(inferred_vars)
+    if not firmware_vars.is_file():
+        return fail("--firmware-vars must name an existing UEFI variable-store template")
     actual_digest = sha256_file(iso)
     base_result: dict[str, object] = {
         "schema_version": 1,
