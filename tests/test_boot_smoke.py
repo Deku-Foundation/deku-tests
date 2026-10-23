@@ -59,10 +59,10 @@ class BootSmokeUnitTests(unittest.TestCase):
     def test_guest_failure_marker_is_recognized(self):
         import re
 
-        match = re.search(r"DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})", "DEKU_BOOT_FAIL:selinux-not-enforcing")
+        match = re.search(r"(?m)^DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})$", "DEKU_BOOT_FAIL:selinux-not-enforcing\\n")
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), "selinux-not-enforcing")
-        self.assertIsNone(re.search(r"DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})", "DEKU_BOOT_FAIL:bad value"))
+        self.assertIsNone(re.search(r"(?m)^DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})$", "DEKU_BOOT_FAIL:bad value\\n"))
 
     def test_result_evidence_is_valid_json(self):
         from tools.boot_smoke import save_result
