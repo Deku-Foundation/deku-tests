@@ -1,0 +1,47 @@
+name: Keep branch set small
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: branch-hygiene-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository with write access
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Keep main and dev; preserve active pull requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          while read -r _ ref; do
+            branch="${ref#refs/heads/}"
+            case "$branch" in
+              main|dev) continue ;;
+            esac
+
+            # Never delete the head of an open pull request.
+            open_prs="$(gh pr list --state open --head "$branch" --json number --jq 'length')"
+            if [[ "$open_prs" != "0" ]]; then
+              printf 'Preserving branch with %s open PR(s): %s\n' "$open_prs" "$branch"
+              continue
+            fi
+
+            printf 'Deleting non-standard branch without open PRs: %s\n' "$branch"
+            git push origin --delete "$branch"
+          done < <(git ls-remote --heads origin)
