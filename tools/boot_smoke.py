@@ -167,7 +167,7 @@ def main() -> int:
                     if args.marker in current_log:
                         marker_found = True
                         break
-                    failed = re.search(r"DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})", current_log)
+                    failed = re.search(r"(?m)^DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})$", current_log)
                     if failed:
                         failure_marker = failed.group(1)
                         break
