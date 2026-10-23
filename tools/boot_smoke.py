@@ -38,11 +38,39 @@ def save_result(directory: Path, result: dict[str, object]) -> None:
     )
 
 
+def build_qemu_command(
+    qemu: str,
+    iso: Path,
+    firmware: Path,
+    firmware_vars: Path,
+    serial_log: Path,
+    writable_vars: Path,
+) -> list[str]:
+    """Build a QEMU command using the UEFI pflash code/variable-store pair."""
+    return [
+        qemu,
+        "-machine", "q35",
+        "-accel", "tcg",
+        "-m", "2048",
+        "-smp", "2",
+        "-drive", f"if=pflash,format=raw,readonly=on,file={firmware}",
+        "-drive", f"if=pflash,format=raw,file={writable_vars}",
+        "-cdrom", str(iso),
+        "-boot", "d",
+        "-display", "none",
+        "-monitor", "none",
+        "-serial", f"file:{serial_log}",
+        "-no-reboot",
+        "-no-shutdown",
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iso", required=True, type=Path, help="existing ISO to boot")
     parser.add_argument("--sha256", required=True, help="expected lowercase SHA-256 of the ISO")
     parser.add_argument("--firmware", required=True, type=Path, help="UEFI firmware code file")
+    parser.add_argument("--firmware-vars", required=True, type=Path, help="matching writable UEFI variable-store template")
     parser.add_argument("--marker", required=True, help="serial marker emitted after userspace is ready")
     parser.add_argument("--timeout", type=int, default=180, help="boot timeout in seconds (default: 180)")
     parser.add_argument("--qemu", default="qemu-system-x86_64", help="QEMU executable")
@@ -64,7 +92,9 @@ def main() -> int:
     if not args.iso.is_file() or args.iso.stat().st_size == 0:
         return fail("--iso must name an existing non-empty file")
     if not args.firmware.is_file():
-        return fail("--firmware must name an existing UEFI firmware file")
+        return fail("--firmware must name an existing UEFI firmware code file")
+    if not args.firmware_vars.is_file():
+        return fail("--firmware-vars must name an existing UEFI variable-store template")
     if not args.marker or len(args.marker) > 256 or any(ord(c) < 32 for c in args.marker):
         return fail("--marker must contain 1 to 256 printable characters")
     if not 10 <= args.timeout <= 900:
@@ -74,6 +104,7 @@ def main() -> int:
 
     iso = args.iso.resolve()
     firmware = args.firmware.resolve()
+    firmware_vars = args.firmware_vars.resolve()
     actual_digest = sha256_file(iso)
     base_result: dict[str, object] = {
         "schema_version": 1,
@@ -84,6 +115,7 @@ def main() -> int:
         "actual_sha256": actual_digest,
         "marker": args.marker,
         "firmware": str(firmware),
+        "firmware_vars_template": str(firmware_vars),
         "timeout_seconds": args.timeout,
     }
     if actual_digest != args.sha256:
@@ -94,21 +126,11 @@ def main() -> int:
         temp_dir = Path(temp_name)
         serial_log = temp_dir / "serial.log"
         qemu_stderr = temp_dir / "qemu.stderr.log"
-        command = [
-            args.qemu,
-            "-machine", "q35",
-            "-accel", "tcg",
-            "-m", "2048",
-            "-smp", "2",
-            "-bios", str(firmware),
-            "-cdrom", str(iso),
-            "-boot", "d",
-            "-display", "none",
-            "-monitor", "none",
-            "-serial", f"file:{serial_log}",
-            "-no-reboot",
-            "-no-shutdown",
-        ]
+        writable_vars = temp_dir / "OVMF_VARS.fd"
+        shutil.copyfile(firmware_vars, writable_vars)
+        command = build_qemu_command(
+            args.qemu, iso, firmware, firmware_vars, serial_log, writable_vars
+        )
         start = time.monotonic()
         marker_found = False
         exit_code: int | None = None
