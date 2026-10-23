@@ -149,6 +149,7 @@ def main() -> int:
         )
         start = time.monotonic()
         marker_found = False
+        failure_marker = ""
         exit_code: int | None = None
         qemu_error = ""
 
@@ -165,6 +166,10 @@ def main() -> int:
                     current_log = serial_log.read_text(encoding="utf-8", errors="replace") if serial_log.exists() else ""
                     if args.marker in current_log:
                         marker_found = True
+                        break
+                    failed = re.search(r"DEKU_BOOT_FAIL:([A-Za-z0-9_.:-]{1,128})", current_log)
+                    if failed:
+                        failure_marker = failed.group(1)
                         break
                     exit_code = process.poll()
                     if exit_code is not None:
@@ -199,9 +204,18 @@ def main() -> int:
         base_result.update({
             "elapsed_seconds": elapsed,
             "marker_found": marker_found,
+            "failure_marker": failure_marker or None,
             "qemu_exit_code": exit_code,
             "serial_bytes": len(serial_text.encode("utf-8")),
         })
+
+        if failure_marker:
+            base_result["failure"] = f"guest acceptance check failed: {failure_marker}"
+            if evidence_dir:
+                save_result(evidence_dir, base_result)
+            print(f"FAIL: guest acceptance check failed: {failure_marker}", file=sys.stderr)
+            print(serial_text[-8000:], file=sys.stderr)
+            return 1
 
         if not marker_found:
             base_result["failure"] = "userspace marker not observed"
