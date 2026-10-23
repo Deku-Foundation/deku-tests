@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.boot_smoke import _SHA256, build_qemu_command, sha256_file
+from tools.boot_smoke import _SHA256, build_qemu_command, infer_firmware_vars, sha256_file
 
 SCRIPT = Path(__file__).parents[1] / "tools" / "boot_smoke.py"
 
@@ -32,6 +32,11 @@ class BootSmokeUnitTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--evidence-dir", result.stdout)
         self.assertIn("--firmware-vars", result.stdout)
+
+    def test_ovmf_vars_inference_requires_matching_code_filename(self):
+        self.assertEqual(infer_firmware_vars(Path("OVMF_CODE_4M.fd")), Path("OVMF_VARS_4M.fd"))
+        self.assertEqual(infer_firmware_vars(Path("OVMF_CODE.fd")), Path("OVMF_VARS.fd"))
+        self.assertIsNone(infer_firmware_vars(Path("custom-firmware.fd")))
 
     def test_qemu_uses_uefi_pflash_code_and_vars(self):
         command = build_qemu_command(
