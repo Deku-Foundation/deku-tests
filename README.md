@@ -4,7 +4,7 @@ Cross-repository integration and system acceptance tests for Deku Linux.
 
 ## Status
 
-Bootstrap stage. No bootable ISO or supported system exists yet; tests must report this honestly and fail when required artifacts are absent.
+Bootstrap stage. An experimental ISO has been generated, but no ISO has passed the UEFI boot acceptance test or established a supported system.
 
 ## Responsibilities
 
@@ -19,7 +19,7 @@ Never run disk-writing acceptance tests against a developer's real disk. Use dis
 
 ## Boot smoke-test harness
 
-`tools/boot_smoke.py` accepts an existing ISO, its expected SHA-256, a UEFI firmware file, and a serial-console marker. It runs QEMU with software emulation and a bounded timeout; it does not write host disks or build an ISO.
+`tools/boot_smoke.py` accepts an existing ISO, its expected SHA-256, a matching UEFI firmware code/variable-store pair, and a serial-console marker. It uses QEMU pflash for UEFI firmware and a temporary writable copy of the variable store; it runs software emulation with a bounded timeout and does not write host disks or build an ISO.
 
 Example after downloading a workflow artifact:
 

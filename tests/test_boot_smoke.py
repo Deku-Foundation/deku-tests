@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.boot_smoke import _SHA256, sha256_file
+from tools.boot_smoke import _SHA256, build_qemu_command, sha256_file
 
 SCRIPT = Path(__file__).parents[1] / "tools" / "boot_smoke.py"
 
@@ -31,6 +31,25 @@ class BootSmokeUnitTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--evidence-dir", result.stdout)
+        self.assertIn("--firmware-vars", result.stdout)
+
+    def test_qemu_uses_uefi_pflash_code_and_vars(self):
+        command = build_qemu_command(
+            "qemu-system-x86_64",
+            Path("preview.iso"),
+            Path("OVMF_CODE_4M.fd"),
+            Path("serial.log"),
+            Path("OVMF_VARS_copy.fd"),
+        )
+        self.assertIn(
+            "if=pflash,format=raw,readonly=on,file=OVMF_CODE_4M.fd",
+            command,
+        )
+        self.assertIn(
+            "if=pflash,format=raw,file=OVMF_VARS_copy.fd",
+            command,
+        )
+        self.assertNotIn("-bios", command)
 
     def test_result_evidence_is_valid_json(self):
         from tools.boot_smoke import save_result
