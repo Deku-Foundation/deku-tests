@@ -42,7 +42,6 @@ def build_qemu_command(
     qemu: str,
     iso: Path,
     firmware: Path,
-    firmware_vars: Path,
     serial_log: Path,
     writable_vars: Path,
 ) -> list[str]:
@@ -129,7 +128,7 @@ def main() -> int:
         writable_vars = temp_dir / "OVMF_VARS.fd"
         shutil.copyfile(firmware_vars, writable_vars)
         command = build_qemu_command(
-            args.qemu, iso, firmware, firmware_vars, serial_log, writable_vars
+            args.qemu, iso, firmware, serial_log, writable_vars
         )
         start = time.monotonic()
         marker_found = False
