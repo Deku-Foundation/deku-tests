@@ -9,6 +9,7 @@ running after reaching the target.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import hashlib
 import re
 import shutil
@@ -36,6 +37,7 @@ def main() -> int:
     parser.add_argument("--marker", required=True, help="exact ASCII marker emitted after the target userspace is ready")
     parser.add_argument("--timeout", type=int, default=180, help="boot timeout in seconds (default: 180)")
     parser.add_argument("--qemu", default="qemu-system-x86_64", help="QEMU executable")
+    parser.add_argument("--evidence-dir", type=Path, help="persist serial.log in this directory instead of a temporary directory")
     args = parser.parse_args()
 
     if not _SHA256.fullmatch(args.sha256):
@@ -56,8 +58,15 @@ def main() -> int:
         print(f"FAIL: ISO SHA-256 mismatch: expected {args.sha256}, got {actual}", file=sys.stderr)
         return 2
 
-    with tempfile.TemporaryDirectory(prefix="deku-boot-smoke-") as temp_dir:
+    if args.evidence_dir is not None:
+        args.evidence_dir.mkdir(parents=True, exist_ok=True)
+        temp_context = nullcontext(str(args.evidence_dir))
+    else:
+        temp_context = tempfile.TemporaryDirectory(prefix="deku-boot-smoke-")
+
+    with temp_context as temp_dir:
         serial_log = Path(temp_dir) / "serial.log"
+        serial_log.unlink(missing_ok=True)
         command = [
             args.qemu,
             "-machine", "q35",
