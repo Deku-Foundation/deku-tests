@@ -1,6 +1,6 @@
 # Deku Integration Tests
 
-Cross-repository integration and system acceptance tests for Deku Linux.
+Deku Integration Tests defines cross-repository contracts and checks for system assembly and UEFI/QEMU boot evidence.
 
 ## Status
 
